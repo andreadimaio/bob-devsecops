@@ -14,6 +14,15 @@ public class CustomerResource {
 
     record RegisterRequest(String username, String password) {};
 
+    @GET
+    @Path("/search")
+    public List<Customer> searchCustomers(@QueryParam("query") String query) {
+        if (query == null || query.isBlank()) {
+            return List.of();
+        }
+        return Customer.find("LOWER(fullName) LIKE LOWER('%" + query.strip() + "%')").list();
+    }
+
     @POST
     @Path("/register")
     @Transactional
