@@ -2,6 +2,7 @@ package com.ibm.secure.demo;
 
 import java.util.List;
 import io.quarkus.elytron.security.common.BcryptUtil;
+import jakarta.annotation.security.PermitAll;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -16,15 +17,18 @@ public class CustomerResource {
 
     @GET
     @Path("/search")
+    @PermitAll
     public List<Customer> searchCustomers(@QueryParam("query") String query) {
         if (query == null || query.isBlank()) {
             return List.of();
         }
-        return Customer.find("LOWER(fullName) LIKE LOWER('%" + query.strip() + "%')").list();
+        String pattern = "%" + query.strip().toLowerCase() + "%";
+        return Customer.find("LOWER(fullName) LIKE ?1", pattern).list();
     }
 
     @POST
     @Path("/register")
+    @PermitAll
     @Transactional
     public Response registerUser(RegisterRequest request) {
 
