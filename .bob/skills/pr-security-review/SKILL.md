@@ -1,6 +1,6 @@
 ---
 name: pr-security-review
-description: Use when the user wants to run a deep security analysis of the commits in a pull request - reviews the full PR diff for vulnerabilities, hardcoded secrets, injection flaws, and other security issues introduced by the developer.
+description: Use when the user wants to run a SQL injection security analysis of the commits in a pull request - reviews the full PR diff exclusively for SQL injection vulnerabilities introduced by the developer.
 metadata:
   disable-model-invocation: true
   argument-hint: "[base-branch]"
@@ -8,7 +8,7 @@ metadata:
 
 # PR Security Review
 
-Perform a thorough security analysis of all commits in the current pull request.
+Perform a targeted SQL injection security analysis of all commits in the current pull request.
 Follow every step in order. Do not skip steps.
 
 ## Step 1 - Collect the PR diff
@@ -31,60 +31,24 @@ If the command fails (e.g. missing base branch, unshallowed repo), output the fo
 From the **CHANGED FILES** section of the script output, use `read_file` to read each changed file in full.
 This ensures the analysis is grounded in the actual current state of the code, not just the diff lines.
 
-## Step 3 - Analyse for security vulnerabilities
+## Step 3 - Analyse for SQL injection vulnerabilities
 
-Examine the diff and the file contents. For each vulnerability found, record internally:
+Examine the diff and the file contents. Look **exclusively** for SQL injection issues. Ignore every other category of vulnerability. For each SQL injection finding, record internally:
 - `severity`: one of `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`
-- `category`: one of `Secrets & Credentials`, `Injection`, `Authentication & Authorisation`, `Cryptography`, `Network & Binding`, `Input Validation`, `Logging & Error Handling`, `Dependency & Container`
+- `category`: `Injection`
 - `file`: relative path of the affected file
 - `line`: line number as an integer (0 if unknown)
 - `title`: one-line description suitable for a GitHub issue title, max 80 characters
 - `issue`: what is wrong, in 1-3 sentences
 - `fix`: concrete remediation. Include a short code example using \n for line breaks where applicable.
 
-### Checklist
+### Checklist — SQL Injection only
 
-**Secrets & Credentials**
-- Hardcoded passwords, API keys, tokens, or connection strings
-- Secrets committed to `.env`, `application.properties`, or config files
-- Credentials passed as plain environment variables in CI/CD files
-
-**Injection**
-- SQL queries built by string concatenation instead of parameterised queries
-- Use of `eval()`, `exec()`, `Runtime.getRuntime().exec()`, or equivalent
-- Template injection, JNDI injection, or expression language injection
-
-**Authentication & Authorisation**
-- Passwords stored or compared in plaintext
-- Missing or bypassable authentication checks on endpoints
-- JWT or session tokens without proper validation
-- Overly permissive CORS (`origins=*`, `methods=*`, `headers=*`)
-
-**Cryptography**
-- Use of weak algorithms: MD5, SHA-1, DES, RC4, ECB mode
-- Custom encryption logic
-- Insecure random number generation (`java.util.Random` for security purposes)
-- Missing TLS or certificate validation disabled
-
-**Network & Binding**
-- Services binding to `0.0.0.0` or all interfaces
-- HTTP used where HTTPS is required
-- Timeout values missing or set to 0/infinite
-
-**Input Validation**
-- Missing server-side validation of user-supplied data
-- File upload paths or names accepted without sanitisation
-- Regex patterns vulnerable to ReDoS
-
-**Logging & Error Handling**
-- Sensitive data (passwords, tokens, PII) written to logs
-- Stack traces or system details exposed to clients
-- Overly verbose error messages
-
-**Dependency & Container**
-- New dependencies added that are not well-maintained or carry known CVEs
-- Container images not sourced from `registry.redhat.io`
-- Containers running as root
+- SQL queries built by string concatenation or interpolation instead of parameterised queries / prepared statements
+- User-supplied input embedded directly into a SQL string (e.g. `"SELECT … WHERE id = " + userId`)
+- ORM raw-query methods (e.g. `query()`, `raw()`, `nativeQuery`) called with unsanitised user input
+- Stored procedure calls assembled via string formatting with user data
+- Dynamic table or column names constructed from user input without a strict allowlist
 
 ## Step 4 - Output ONLY the JSON result
 
