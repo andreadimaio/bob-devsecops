@@ -30,39 +30,14 @@ The CI/CD pipeline defined in [`.github/workflows/ci.yml`](.github/workflows/ci.
 flowchart TD
     PR[PR opened] --> SR
 
-    SR["**Job 1: security-review**\nIBM Bob Shell\nanalyses all commits in the PR"]
+    SR["IBM Bob Shell\nanalyses the PR"]
     SR -->|SECURITY_PASS| T
     SR -->|SECURITY_FAIL| BL[Pipeline blocked\nPR cannot be merged]
-    SR -->|SECURITY_FAIL| ISS["GitHub Issues created\none per Critical/High finding\nvia jq + gh CLI"]
 
-    T["**Job 2: test**\nMaven runs the\nautomated test suite"]
+    T["Maven runs the\nautomated test suite"]
     T -->|all tests pass| M[Ready to merge]
     T -->|test failure| BL2[Pipeline blocked]
 ```
-
-### Job 1 - Security Review (IBM Bob)
-
-IBM Bob Shell is installed on the runner and invoked in **non-interactive mode** using the custom skill [`pr-security-review`](.bob/skills/pr-security-review/SKILL.md).
-
-The skill performs the following steps:
-
-1. Collects the full diff of every commit in the PR via [`collect-pr-diff.sh`](.bob/skills/pr-security-review/collect-pr-diff.sh)
-2. Reads every changed source file in full
-3. Analyses the code against a security checklist covering: hardcoded secrets, SQL injection, plaintext passwords, insecure service bindings, missing input validation, CORS misconfigurations, weak cryptography, and more
-4. Produces a structured findings report with severity levels (Critical / High / Medium / Low)
-5. Emits a final `SECURITY_PASS` or `SECURITY_FAIL` verdict
-6. Emits a machine-readable `SECURITY_ISSUES_JSON` line containing all Critical/High findings as a JSON array
-
-If any **Critical or High** severity issue is found (CVSS >= 7.0):
-- The pipeline is **blocked** and the PR cannot be merged
-- A **GitHub Issue is automatically created** for each finding, with description, file location, and recommended fix, assigned to the PR author
-- The full Bob report is uploaded as a GitHub Actions artifact and retained for 30 days
-
-The issue creation step uses `jq` to parse the JSON array emitted by Bob and the GitHub CLI (`gh`) to open each issue with the `security` label.
-
-### Job 2 - Automated Tests
-
-Runs only if the security review passes. Executes the Maven test suite (`./mvnw test`) and uploads the Surefire reports as an artifact.
 
 ## Repository structure
 
